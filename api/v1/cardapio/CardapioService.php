@@ -14,13 +14,15 @@ class CardapioService extends InstanciaBanco {
     }
 
     public function getCardapiosDisponiveis() {
-        // Query completa que busca os dados para a Home
         $sql = "select 
                     c.id_usuario,
                     c.nm_usuario || ' ' || c.nm_sobrenome as nm_usuario_anfitriao,
+                    c.vl_foto,
                     a.id_cardapio,
-                    a.ds_cardapio as nm_cardapio,
+                    a.nm_cardapio,
+                    a.ds_cardapio,
                     a.preco_refeicao,
+                    a.vl_foto_cardapio,
                     d.hr_encontro,
                     d.nu_max_convidados,
                     a.id_local,
@@ -40,19 +42,16 @@ class CardapioService extends InstanciaBanco {
         return $resultados;
     }
 
-    // --- NOVA FUNÇÃO PODEROSA ---
     public function createJantarCompleto($dados) {
         try {
-            $this->conexao->beginTransaction(); // Inicia transação para segurança
+            $this->conexao->beginTransaction();
 
-            // 1. CRIAR LOCAL
-            // Gera ID Local
+            // 1. CRIAR LOCAL (mantém igual)
             $sqlSeqL = "select id_sequence from tb_sequence_dn order by id_sequence desc limit 1";
             $resSeq = $this->conexao->query($sqlSeqL)->fetch(PDO::FETCH_ASSOC);
             $idLocal = ($resSeq ? $resSeq['id_sequence'] : 0) + 1;
             $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idLocal, 'L')");
 
-            // Insere Local
             $sqlLocal = "INSERT INTO tb_local_dn (id_local, id_usuario, nu_cep, nu_casa) VALUES (:id, :user, :cep, :num)";
             $stmtL = $this->conexao->prepare($sqlLocal);
             $stmtL->execute([
@@ -62,28 +61,29 @@ class CardapioService extends InstanciaBanco {
                 ':num' => $dados['nu_casa']
             ]);
 
-            // 2. CRIAR CARDAPIO
-            // Gera ID Cardapio
-            $idCardapio = $idLocal + 1; // Simplificação da sequence, ideal seria consultar de novo, mas ok para agora
+            // 2. CRIAR CARDAPIO (AQUI ESTÁ A CORREÇÃO!)
+            $idCardapio = $idLocal + 1;
             $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idCardapio, 'C')");
 
-            // Insere Cardapio (Com Preço!)
-            $sqlCard = "INSERT INTO tb_cardapio_dn (id_cardapio, id_local, nm_cardapio, ds_cardapio, preco_refeicao) VALUES (:id, :loc, :nome, :desc, :preco)";
+            // --- CORREÇÃO: Adicionei vl_foto_cardapio no INSERT ---
+            $sqlCard = "INSERT INTO tb_cardapio_dn (id_cardapio, id_local, nm_cardapio, ds_cardapio, preco_refeicao, vl_foto_cardapio) 
+                        VALUES (:id, :loc, :nome, :desc, :preco, :foto)";
+            
             $stmtC = $this->conexao->prepare($sqlCard);
             $stmtC->execute([
                 ':id' => $idCardapio,
                 ':loc' => $idLocal,
-                ':nome' => $dados['nm_cardapio'], // Título
-                ':desc' => $dados['ds_cardapio'], // Descrição
-                ':preco' => $dados['preco_refeicao']
+                ':nome' => $dados['nm_cardapio'],
+                ':desc' => $dados['ds_cardapio'],
+                ':preco' => $dados['preco_refeicao'],
+                ':foto' => $dados['vl_foto'] // <--- O PHP agora salva o link!
             ]);
+            // -----------------------------------------------------
 
-            // 3. CRIAR ENCONTRO
-            // Gera ID Encontro
+            // 3. CRIAR ENCONTRO (mantém igual)
             $idEncontro = $idCardapio + 1;
             $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idEncontro, 'E')");
 
-            // Insere Encontro
             $sqlEnc = "INSERT INTO tb_encontro_dn (id_encontro, id_local, id_cardapio, hr_encontro, nu_max_convidados, fl_anfitriao_confirma) VALUES (:id, :loc, :card, :hora, :vagas, 'true')";
             $stmtE = $this->conexao->prepare($sqlEnc);
             $stmtE->execute([
@@ -94,11 +94,11 @@ class CardapioService extends InstanciaBanco {
                 ':vagas' => $dados['nu_max_convidados']
             ]);
 
-            $this->conexao->commit(); // Salva tudo
+            $this->conexao->commit();
             $this->banco->setDados(1, ["Mensagem" => "Jantar criado com sucesso!"]);
 
         } catch (Exception $e) {
-            $this->conexao->rollBack(); // Desfaz se der erro
+            $this->conexao->rollBack();
             throw new Exception("Erro ao criar jantar: " . $e->getMessage());
         }
     }

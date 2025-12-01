@@ -1,36 +1,46 @@
 <?php
 require_once('../../database/InstanciaBanco.php');
 
-
 class LocalService extends InstanciaBanco {
+    
     public function getLocal() {
         $sql = "SELECT * from tb_local_dn where id_local = ".$_GET['id_local'];
-
         $consulta = $this->conexao->query($sql);
         $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
         $this->banco->setDados(count($resultados), $resultados);
-
-        if (!$resultados) {
-            $this->banco->setDados(0, []);
-        }
-        
+        if (!$resultados) { $this->banco->setDados(0, []); }
         return $resultados;
     }
 
     public function getLocais() {
-         
         $sql = "SELECT * from tb_local_dn";
-
         $consulta = $this->conexao->query($sql);
         $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
         $this->banco->setDados(count($resultados), $resultados);
+        if (!$resultados) { $this->banco->setDados(0, []); }
+        return $resultados;
+    }
 
+    // --- A FUNÇÃO QUE BUSCA OS LOCAIS DO USUÁRIO ---
+    public function getMeusLocais() {
+        $id_usuario = $_GET['id_usuario'];
+        
+        // Ordena pelo ID decrescente para o último criado aparecer primeiro
+        $sql = "SELECT * FROM tb_local_dn WHERE id_usuario = " . $id_usuario . " ORDER BY id_local DESC";
+
+        $consulta = $this->conexao->query($sql);
+        $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
+        
+        $this->banco->setDados(count($resultados), $resultados);
+
+        // Se não achar nada, retorna lista vazia (não null)
         if (!$resultados) {
             $this->banco->setDados(0, []);
         }
         
         return $resultados;
     }
+    // ------------------------------------------------
 
     public function createLocal($nu_cep, $nu_casa, $id_usuario, $nu_cnpj, $dc_complemento) {
         $sql = "select id_sequence from tb_sequence_dn order by id_sequence desc limit 1;";
@@ -38,19 +48,19 @@ class LocalService extends InstanciaBanco {
         $maiorid = $consulta->fetchAll(PDO::FETCH_ASSOC);
 
         if (!$maiorid){
-            throw new Exception("Maior id não localizado");
+            $maiorid = 1;
+        } else {
+            $maiorid = $maiorid[0]['id_sequence'] + 1;
         }
-        $novo_id = $maiorid[0]['id_sequence'] + 1;
         
-        $sqlseq ="INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES (".$novo_id.", 'L')";
-        $insertseq = $this->conexao->query($sqlseq);
-        $responseseq = $insertseq->fetchAll(PDO::FETCH_ASSOC);
-        if (!$responseseq){throw new Exception("Não foi possível criar a sequence do usuario");}
-        $sql = "INSERT INTO tb_local_dn (id_local, id_usuario, nu_cep, nu_casa, nu_cnpj,dc_complemento) VALUES (:id_local, :id_usuario, :nu_cep, :nu_casa, :nu_cnpj,:dc_complemento)";
+        $sqlseq ="INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES (".$maiorid.", 'L')";
+        $this->conexao->query($sqlseq);
+        
+        $sql = "INSERT INTO tb_local_dn (id_local, id_usuario, nu_cep, nu_casa, nu_cnpj, dc_complemento) VALUES (:id_local, :id_usuario, :nu_cep, :nu_casa, :nu_cnpj, :dc_complemento)";
 
         $insertlocal = $this->conexao->prepare($sql);
 
-        $insertlocal->bindValue(':id_local', $novo_id, PDO::PARAM_INT);
+        $insertlocal->bindValue(':id_local', $maiorid, PDO::PARAM_INT);
         $insertlocal->bindValue(':id_usuario', $id_usuario, PDO::PARAM_INT);
         $insertlocal->bindValue(':nu_cnpj', $nu_cnpj, PDO::PARAM_STR);
         $insertlocal->bindValue(':nu_cep', $nu_cep, PDO::PARAM_STR);
@@ -58,30 +68,24 @@ class LocalService extends InstanciaBanco {
         $insertlocal->bindValue(':dc_complemento', $dc_complemento, PDO::PARAM_STR);
         $resultados = $insertlocal->execute();
 
+        // Retorna True ou o próprio objeto criado para confirmação
         if ($resultados) {
-            $this->banco->setDados(1, [$resultados]);
-        }else{
+            $this->banco->setDados(1, ["Mensagem" => "Local criado com sucesso"]);
+        } else {
             throw new Exception("Não foi possível criar o local");
         }
         return $resultados;
     }
     
-    
     public function deleteLocal($id_local) {
+        // Limpeza de dependências (Cascata manual caso o banco não tenha)
+        $this->conexao->query("DELETE FROM tb_encontro_dn WHERE id_local = $id_local");
+        $this->conexao->query("DELETE FROM tb_cardapio_dn WHERE id_local = $id_local");
+
         $sql = "DELETE FROM tb_local_dn WHERE id_local = ".$id_local;
-
         $deleteuser = $this->conexao->query($sql);
-        $responseuser = $deleteuser->fetchAll(PDO::FETCH_ASSOC);
-        if (!$responseuser){throw new Exception("Não foi possível deletar usuário");}
-
+        
         $this->banco->setMensagem(1, "Deletado com sucesso");
-        return $responseuser;
     }
-
-    // Exemplo de rotas na url:
-    // http://localhost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=getRefeicoes
-    // http://localhost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=getRefeicao&id_refeicao=2
-    // http://localhost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=createRefeicao
-    // http://localhost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=updateRefeicao
-    // http://localhost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=deleteRefeicao
 }
+?>

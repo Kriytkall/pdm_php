@@ -3,7 +3,7 @@
     require_once('../../database/Banco.php');
 
     try {  
-        // Tratamento para POST via x-www-form-urlencoded (Flutter HttpService novo)
+        // Tratamento para POST via x-www-form-urlencoded
         $operacao = isset($_REQUEST['operacao']) ? $_REQUEST['operacao'] : "Não informado [Erro]";
     
         $banco = new Banco(null,null,null,null,null,null);
@@ -14,20 +14,34 @@
                 $CardapioService->getCardapiosDisponiveis();
                 break;
             
-            // --- NOVA OPERAÇÃO ---
             case 'createJantar':
-                // Coleta todos os dados necessários
+                // --- CORREÇÃO AQUI ---
+                // Adicionamos a linha 'vl_foto' para pegar o link que o Flutter mandou
                 $dados = [
-                    'id_usuario' => $_POST['id_usuario'] ?? throw new Exception("Faltou id_usuario"),
-                    'nm_cardapio' => $_POST['nm_cardapio'] ?? throw new Exception("Faltou titulo"),
-                    'ds_cardapio' => $_POST['ds_cardapio'] ?? throw new Exception("Faltou descricao"),
-                    'preco_refeicao' => $_POST['preco_refeicao'] ?? throw new Exception("Faltou preco"),
-                    'hr_encontro' => $_POST['hr_encontro'] ?? throw new Exception("Faltou data"),
+                    'id_usuario'        => $_POST['id_usuario'] ?? throw new Exception("Faltou id_usuario"),
+                    'nm_cardapio'       => $_POST['nm_cardapio'] ?? throw new Exception("Faltou titulo"),
+                    'ds_cardapio'       => $_POST['ds_cardapio'] ?? throw new Exception("Faltou descricao"),
+                    'preco_refeicao'    => $_POST['preco_refeicao'] ?? throw new Exception("Faltou preco"),
+                    'hr_encontro'       => $_POST['hr_encontro'] ?? throw new Exception("Faltou data"),
                     'nu_max_convidados' => $_POST['nu_max_convidados'] ?? throw new Exception("Faltou vagas"),
-                    'nu_cep' => $_POST['nu_cep'] ?? throw new Exception("Faltou cep"),
-                    'nu_casa' => $_POST['nu_casa'] ?? throw new Exception("Faltou numero"),
+                    'nu_cep'            => $_POST['nu_cep'] ?? throw new Exception("Faltou cep"),
+                    'nu_casa'           => $_POST['nu_casa'] ?? throw new Exception("Faltou numero"),
+                    // LINHA IMPORTANTE ADICIONADA:
+                    'vl_foto'           => $_POST['vl_foto'] ?? null, 
                 ];
+                
                 $CardapioService->createJantarCompleto($dados);
+                break;
+                
+            case 'getMeuCardapio':
+                // Adicionei caso você precise listar os jantares no perfil depois
+                if (!isset($_GET['id_local'])) throw new Exception("id_local não informado");
+                $CardapioService->getMeuCardapio();
+                break;
+
+            case 'deleteCardapio':
+                $id_cardapio = $_POST['id_cardapio'] ?? throw new Exception("id_cardapio faltando");
+                $CardapioService->deleteJantar($id_cardapio);
                 break;
 
             default:
