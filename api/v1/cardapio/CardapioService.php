@@ -17,7 +17,7 @@ class CardapioService extends InstanciaBanco {
         $sql = "select 
                     c.id_usuario,
                     c.nm_usuario || ' ' || c.nm_sobrenome as nm_usuario_anfitriao,
-                    c.vl_foto,
+                    c.vl_foto as vl_foto_usuario,
                     a.id_cardapio,
                     a.nm_cardapio,
                     a.ds_cardapio,
@@ -25,9 +25,15 @@ class CardapioService extends InstanciaBanco {
                     a.vl_foto_cardapio,
                     d.hr_encontro,
                     d.nu_max_convidados,
+                    d.id_encontro,
                     a.id_local,
                     b.nu_cep,
-                    b.nu_casa
+                    b.nu_casa,
+                    (
+                        SELECT COALESCE(SUM(1 + eu.nu_dependentes), 0)
+                        FROM tb_encontro_usuario_dn eu
+                        WHERE eu.id_encontro = d.id_encontro
+                    ) as nu_convidados_confirmados
                 from tb_cardapio_dn a 
                 inner join tb_local_dn b on a.id_local = b.id_local
                 inner join tb_usuario_dn c on b.id_usuario = c.id_usuario
