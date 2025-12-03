@@ -1,36 +1,43 @@
 <?php
-      
     require_once('./AvaliacaoService.php');
     require_once('../../database/Banco.php');
 
     try {  
+        // Aceita tanto JSON quanto x-www-form-urlencoded
         $jsonPostData = json_decode(file_get_contents("php://input"), true);
-
-        $operacao = isset($_REQUEST['operacao']) ? $_REQUEST['operacao'] : "Não informado [Erro]";
-    
-        $banco = new Banco(null,null,null,null,null,null);
+        $operacao = isset($_REQUEST['operacao']) ? $_REQUEST['operacao'] : "Não informado";
         
+        $banco = new Banco(null,null,null,null,null,null);
         $AvaliacaoService = new AvaliacaoService($banco);
         
         switch ($operacao) {
-            case 'getAvaliacao':
-                $AvaliacaoService->getAvaliacao();
-                break;   
-            case 'getAvaliacoes':
-                $AvaliacaoService->getAvaliacoes();
+            
+            // Retorna os tipos (1=Comida, 2=Hospitalidade, 3=Pontualidade)
+            case 'getTiposAvaliacao':
+                $AvaliacaoService->getTiposAvaliacao();
                 break;  
+
+            // Salva uma nota vinda do App
             case 'createAvaliacao':
-                $id_usuario = isset($_POST['id_usuario']) ? $_POST['id_usuario'] : throw new Exception("campo id_usuario não fornecido");
-                $id_encontro = isset($_POST['id_encontro']) ? $_POST['id_encontro'] : throw new Exception("campo id_encontro não fornecido");
-                $id_avaliacao = isset($_POST['id_avaliacao']) ? $_POST['id_avaliacao'] : throw new Exception("campo id_avaliacao não fornecido");
-                $vl_avaliacao = isset($_POST['vl_avaliacao']) ? $_POST['vl_avaliacao'] : throw new Exception("campo vl_avaliacao não fornecido");
+                $id_usuario = $_POST['id_usuario'] ?? throw new Exception("Faltou id_usuario");
+                $id_encontro = $_POST['id_encontro'] ?? throw new Exception("Faltou id_encontro");
+                $id_avaliacao = $_POST['id_avaliacao'] ?? throw new Exception("Faltou id_avaliacao (tipo)");
+                $vl_avaliacao = $_POST['vl_avaliacao'] ?? throw new Exception("Faltou nota");
+                
                 $AvaliacaoService->createAvaliacao($id_usuario, $id_encontro, $vl_avaliacao, $id_avaliacao);
                 break;    
+
+            // Busca a média para exibir no perfil
+            case 'getMediaUsuario':
+                $id_usuario = $_GET['id_usuario'] ?? throw new Exception("Faltou id_usuario");
+                $AvaliacaoService->getMediaAvaliacaoUsuario($id_usuario);
+                break;
+
             default:
-                $banco->setMensagem(1, 'Operação informada não tratada. Operação=' . $operacao);
+                $banco->setMensagem(1, 'Operação não tratada: ' . $operacao);
                 break;
         }
-
+        
         echo $banco->getRetorno();
         unset($banco);
     }
@@ -40,15 +47,8 @@
             echo $banco->getRetorno();
             unset($banco);
         } else {
-            header("Content-Type: application/json; charset=UTF-8");
-            echo json_encode([
-                "operacao" => isset($operacao) ? $operacao : 'desconhecida',
-                "NumMens" => 1,
-                "Mensagem" => $e->getMessage(),
-                "registros" => 0,
-                "dados" => null
-            ]);
+            // Fallback de erro JSON manual
+            echo json_encode(["Mensagem" => $e->getMessage()]);
         }
-    }
-            
+    }      
 ?>

@@ -1,72 +1,72 @@
 <?php
 require_once('../../database/InstanciaBanco.php');
 
-
 class AvaliacaoService extends InstanciaBanco {
-    public function getAvaliacao() {
-        $sql = "SELECT * from tb_avaliacao_encontro_dn where id_encontro = ".$_GET['id_encontro']." and id_usuario = ".$_GET['id_usuario'];
-
-        $consulta = $this->conexao->query($sql);
-        $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
-        $this->banco->setDados(count($resultados), $resultados);
-
-        if (!$resultados) {
-            $this->banco->setDados(0, []);
-        }
-        
-        return $resultados;
-    }
-
-    public function getAvaliacoes() {
-        $sql = "SELECT * from tb_tipo_avaliacao_dn";
-
-        $consulta = $this->conexao->query($sql);
-        $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
-        $this->banco->setDados(count($resultados), $resultados);
-
-        if (!$resultados) {
-            $this->banco->setDados(0, []);
-        }
-        
-        return $resultados;
-    }
 
     public function createAvaliacao($id_usuario, $id_encontro, $vl_avaliacao, $id_avaliacao) {
         
-        $sql = "INSERT INTO tb_avaliacao_encontro_dn (id_usuario, id_encontro, vl_avaliacao, id_avaliacao) VALUES (:id_usuario, :id_encontro,:vl_avaliacao, :id_avaliacao)";
-
-        $insertavaliacao = $this->conexao->prepare($sql);
-
-        $insertavaliacao->bindValue(':id_usuario', $id_usuario, PDO::PARAM_INT);
-        $insertavaliacao->bindValue(':id_encontro', $id_encontro, PDO::PARAM_INT);
-        $insertavaliacao->bindValue(':vl_avaliacao', $vl_avaliacao, PDO::PARAM_STR);
-        $insertavaliacao->bindValue(':id_avaliacao', $id_avaliacao, PDO::PARAM_STR);
-        $resultados = $insertavaliacao->execute();
-
-        if ($resultados) {
-            $this->banco->setDados(1, [$resultados]);
-        }else{
-            throw new Exception("Não foi possível criar a avaliacao do encontro");
+        $check = $this->conexao->prepare("SELECT * FROM tb_avaliacao_encontro_dn WHERE id_usuario = :user AND id_encontro = :enc AND id_avaliacao = :tipo");
+        $check->execute([':user' => $id_usuario, ':enc' => $id_encontro, ':tipo' => $id_avaliacao]);
+        
+        if ($check->rowCount() > 0) {
+            throw new Exception("Você já avaliou este critério para este jantar.");
         }
-        return $resultados;
+
+        $sql = "INSERT INTO tb_avaliacao_encontro_dn (id_usuario, id_encontro, vl_avaliacao, id_avaliacao) 
+                VALUES (:id_usuario, :id_encontro, :vl_avaliacao, :id_avaliacao)";
+
+        $stmt = $this->conexao->prepare($sql);
+        $stmt->bindValue(':id_usuario', $id_usuario, PDO::PARAM_INT);
+        $stmt->bindValue(':id_encontro', $id_encontro, PDO::PARAM_INT);
+        $stmt->bindValue(':vl_avaliacao', (int)$vl_avaliacao, PDO::PARAM_INT);
+        $stmt->bindValue(':id_avaliacao', $id_avaliacao, PDO::PARAM_INT);
+
+        if ($stmt->execute()) {
+            $this->banco->setDados(1, ["Mensagem" => "Avaliação registrada!"]);
+        } else {
+            throw new Exception("Erro ao salvar avaliação.");
+        }
     }
-    
-    
-    public function deleteavaliacao($id_avaliacao) {
-        $sql = "DELETE FROM tb_avaliacao_dn WHERE id_avaliacao = ".$_POST['id_avaliacao'];
 
-        $deleteuser = $this->conexao->query($sql);
-        $responseuser = $deleteuser->fetchAll(PDO::FETCH_ASSOC);
-        if (!$responseuser){throw new Exception("Não foi possível deletar o avaliacao");}
-
-        $this->banco->setMensagem(1, "Deletado com sucesso");
-        return $responseuser;
+    public function getTiposAvaliacao() {
+        $sql = "SELECT * FROM tb_tipo_avaliacao_dn";
+        $consulta = $this->conexao->query($sql);
+        $resultados = $consulta->fetchAll(PDO::FETCH_ASSOC);
+        $this->banco->setDados(count($resultados), $resultados);
+        if (!$resultados) { $this->banco->setDados(0, []); }
     }
 
-    // Exemplo de rotas na url:
-    // http://avaliacaohost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=getRefeicoes
-    // http://avaliacaohost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=getRefeicao&id_refeicao=2
-    // http://avaliacaohost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=createRefeicao
-    // http://avaliacaohost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=updateRefeicao
-    // http://avaliacaohost/pdm/api/v1/refeicao/RefeicaoController.php/?operacao=deleteRefeicao
+    public function getMediaAvaliacaoUsuario($id_anfitriao) {
+        // --- CORREÇÃO NA QUERY ---
+        // Usamos COUNT(av.vl_avaliacao) em vez de id_avaliacao_encontro que não existe
+        $sql = "
+            SELECT 
+                COALESCE(AVG(av.vl_avaliacao), 0) as media_geral, 
+                COUNT(av.vl_avaliacao) as total_avaliacoes 
+            FROM tb_usuario_dn u
+            LEFT JOIN tb_local_dn l ON u.id_usuario = l.id_usuario
+            LEFT JOIN tb_encontro_dn e ON l.id_local = e.id_local
+            LEFT JOIN tb_avaliacao_encontro_dn av ON e.id_encontro = av.id_encontro
+            WHERE u.id_usuario = :id_anfitriao
+        ";
+
+        $stmt = $this->conexao->prepare($sql);
+        $stmt->bindValue(':id_anfitriao', $id_anfitriao, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $media = $resultado['media_geral'] ? round($resultado['media_geral'], 1) : 0;
+        $total = $resultado['total_avaliacoes'] ? $resultado['total_avaliacoes'] : 0;
+
+        // Como salvamos 3 notas por jantar (Comida, Hospitalidade, Pontualidade),
+        // o total real de "avaliações de pessoas" é o total de registros dividido por 3.
+        // Mas para simplificar e mostrar atividade, vamos mostrar o total de itens avaliados.
+        
+        $this->banco->setDados(1, [
+            "media" => $media,
+            "total" => $total
+        ]);
+    }
 }
+?>

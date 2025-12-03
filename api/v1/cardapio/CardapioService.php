@@ -108,5 +108,98 @@ class CardapioService extends InstanciaBanco {
             throw new Exception("Erro ao criar jantar: " . $e->getMessage());
         }
     }
+
+    public function updateJantar($dados) {
+        try {
+            $this->conexao->beginTransaction();
+
+            // 1. Atualiza Cardápio (Título, Descrição, Preço, Foto)
+            $sqlC = "UPDATE tb_cardapio_dn SET 
+                        nm_cardapio = :nome, 
+                        ds_cardapio = :desc, 
+                        preco_refeicao = :preco,
+                        vl_foto_cardapio = :foto 
+                     WHERE id_cardapio = :id";
+            
+            $stmtC = $this->conexao->prepare($sqlC);
+            $stmtC->execute([
+                ':nome' => $dados['nm_cardapio'],
+                ':desc' => $dados['ds_cardapio'],
+                ':preco' => $dados['preco_refeicao'],
+                ':foto' => $dados['vl_foto'],
+                ':id' => $dados['id_cardapio']
+            ]);
+
+            // 2. Atualiza Encontro (Data, Vagas) - Usando id_cardapio para achar
+            $sqlE = "UPDATE tb_encontro_dn SET 
+                        hr_encontro = :hora, 
+                        nu_max_convidados = :vagas 
+                     WHERE id_cardapio = :idCardapio"; // Assumindo relação 1-1
+            
+            $stmtE = $this->conexao->prepare($sqlE);
+            $stmtE->execute([
+                ':hora' => $dados['hr_encontro'],
+                ':vagas' => $dados['nu_max_convidados'],
+                ':idCardapio' => $dados['id_cardapio']
+            ]);
+
+            // 3. Atualiza Local (CEP, Número) - Busca id_local pelo cardapio
+            $sqlL = "UPDATE tb_local_dn SET 
+                        nu_cep = :cep, 
+                        nu_casa = :num 
+                     WHERE id_local = (SELECT id_local FROM tb_cardapio_dn WHERE id_cardapio = :idCard)";
+            
+            $stmtL = $this->conexao->prepare($sqlL);
+            $stmtL->execute([
+                ':cep' => $dados['nu_cep'],
+                ':num' => $dados['nu_casa'],
+                ':idCard' => $dados['id_cardapio']
+            ]);
+
+            $this->conexao->commit();
+            $this->banco->setDados(1, ["Mensagem" => "Jantar atualizado com sucesso!"]);
+
+        } catch (Exception $e) {
+            $this->conexao->rollBack();
+            throw new Exception("Erro ao atualizar: " . $e->getMessage());
+        }
+    }
+
+    // --- DELETAR JANTAR (COM LIMPEZA) ---
+    public function deleteJantar($idCardapio) {
+        try {
+            $this->conexao->beginTransaction();
+
+            // 1. Descobrir IDs relacionados
+            $sqlIds = "SELECT id_local, id_encontro FROM tb_encontro_dn WHERE id_cardapio = :id";
+            $stmt = $this->conexao->prepare($sqlIds);
+            $stmt->execute([':id' => $idCardapio]);
+            $ids = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($ids) {
+                $idEncontro = $ids['id_encontro'];
+                $idLocal = $ids['id_local'];
+
+                // 2. Remover Participantes (tb_encontro_usuario_dn)
+                $this->conexao->exec("DELETE FROM tb_encontro_usuario_dn WHERE id_encontro = $idEncontro");
+
+                // 3. Remover Encontro (tb_encontro_dn)
+                $this->conexao->exec("DELETE FROM tb_encontro_dn WHERE id_encontro = $idEncontro");
+
+                // 4. Remover Cardapio (tb_cardapio_dn)
+                $this->conexao->exec("DELETE FROM tb_cardapio_dn WHERE id_cardapio = $idCardapio");
+
+                // 5. Remover Local (tb_local_dn) - Opcional, se o local for exclusivo desse jantar
+                $this->conexao->exec("DELETE FROM tb_local_dn WHERE id_local = $idLocal");
+            }
+
+            $this->conexao->commit();
+            $this->banco->setDados(1, ["Mensagem" => "Jantar cancelado e excluído."]);
+
+        } catch (Exception $e) {
+            $this->conexao->rollBack();
+            throw new Exception("Erro ao excluir: " . $e->getMessage());
+        }
+    }
 }
 ?>

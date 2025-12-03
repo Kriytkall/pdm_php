@@ -15,8 +15,6 @@
                 break;
             
             case 'createJantar':
-                // --- CORREÇÃO AQUI ---
-                // Adicionamos a linha 'vl_foto' para pegar o link que o Flutter mandou
                 $dados = [
                     'id_usuario'        => $_POST['id_usuario'] ?? throw new Exception("Faltou id_usuario"),
                     'nm_cardapio'       => $_POST['nm_cardapio'] ?? throw new Exception("Faltou titulo"),
@@ -42,6 +40,21 @@
             case 'deleteCardapio':
                 $id_cardapio = $_POST['id_cardapio'] ?? throw new Exception("id_cardapio faltando");
                 $CardapioService->deleteJantar($id_cardapio);
+                break;
+
+            case 'updateJantar':
+                $dados = [
+                    'id_cardapio'       => $_POST['id_cardapio'] ?? throw new Exception("Faltou ID"),
+                    'nm_cardapio'       => $_POST['nm_cardapio'],
+                    'ds_cardapio'       => $_POST['ds_cardapio'],
+                    'preco_refeicao'    => $_POST['preco_refeicao'],
+                    'hr_encontro'       => $_POST['hr_encontro'],
+                    'nu_max_convidados' => $_POST['nu_max_convidados'],
+                    'nu_cep'            => $_POST['nu_cep'],
+                    'nu_casa'           => $_POST['nu_casa'],
+                    'vl_foto'           => $_POST['vl_foto'],
+                ];
+                $CardapioService->updateJantar($dados);
                 break;
 
             default:

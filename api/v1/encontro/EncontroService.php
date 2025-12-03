@@ -4,6 +4,7 @@ require_once('../../database/InstanciaBanco.php');
 class EncontroService extends InstanciaBanco {
 
     public function addUsuarioEncontro($id_usuario, $id_encontro, $nu_dependentes) {
+        // ... (código existente de adicionar reserva) ...
         // 1. Verifica se já reservou
         $check = $this->conexao->query("SELECT * FROM tb_encontro_usuario_dn WHERE id_usuario = $id_usuario AND id_encontro = $id_encontro");
         if ($check->rowCount() > 0) {
@@ -28,13 +29,13 @@ class EncontroService extends InstanciaBanco {
 
         $max = $dados['nu_max_convidados'];
         $atual = $dados['total_atual'];
-        $novos = 1 + $nu_dependentes; // Você + seus convidados
+        $novos = 1 + $nu_dependentes;
 
         if (($atual + $novos) > $max) {
-            throw new Exception("Não há vagas suficientes. Restam apenas " . ($max - $atual) . " lugares.");
+            throw new Exception("Não há vagas suficientes.");
         }
 
-        // 3. Se passou, insere
+        // 3. Insere
         $sql = "INSERT INTO tb_encontro_usuario_dn (id_usuario, id_encontro, nu_dependentes, fl_anfitriao) 
                 VALUES (:id_usuario, :id_encontro, :deps, 'false')";
         
@@ -50,8 +51,34 @@ class EncontroService extends InstanciaBanco {
         }
     }
 
-    // (As outras funções getMinhasReservas e getMeusJantaresCriados continuam iguais...)
-    // Mantenha o restante do arquivo igual ao anterior
+    // --- NOVA FUNÇÃO 1: VERIFICAR SE JÁ RESERVEI ---
+    public function verificarReserva($id_usuario, $id_encontro) {
+        $sql = "SELECT * FROM tb_encontro_usuario_dn WHERE id_usuario = :user AND id_encontro = :encontro";
+        $stmt = $this->conexao->prepare($sql);
+        $stmt->execute([':user' => $id_usuario, ':encontro' => $id_encontro]);
+        
+        if ($stmt->rowCount() > 0) {
+            $this->banco->setDados(1, ["ja_reservou" => true]);
+        } else {
+            $this->banco->setDados(0, ["ja_reservou" => false]);
+        }
+    }
+
+    // --- NOVA FUNÇÃO 2: CANCELAR MINHA RESERVA ---
+    public function deleteUsuarioEncontro($id_usuario, $id_encontro) {
+        $sql = "DELETE FROM tb_encontro_usuario_dn WHERE id_usuario = :user AND id_encontro = :encontro";
+        $stmt = $this->conexao->prepare($sql);
+        $stmt->bindValue(':user', $id_usuario, PDO::PARAM_INT);
+        $stmt->bindValue(':encontro', $id_encontro, PDO::PARAM_INT);
+        
+        if ($stmt->execute()) {
+             $this->banco->setDados(1, ["Mensagem" => "Reserva cancelada."]);
+        } else {
+             throw new Exception("Erro ao cancelar reserva.");
+        }
+    }
+
+    // ... (Mantenha getMinhasReservas e getMeusJantaresCriados iguais) ...
     public function getMinhasReservas($id_usuario) {
         $sql = "SELECT 
                     c.id_cardapio,

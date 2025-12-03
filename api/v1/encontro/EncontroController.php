@@ -8,13 +8,28 @@
         $EncontroService = new EncontroService($banco);
         
         switch ($operacao) {
-            case 'reservar': // Nome mais amigável
+            case 'reservar':
             case 'addUsuarioEncontro':
                 $id_encontro = $_POST['id_encontro'] ?? throw new Exception("id_encontro faltando");
                 $id_usuario = $_POST['id_usuario'] ?? throw new Exception("id_usuario faltando");
                 $deps = $_POST['nu_dependentes'] ?? 0;
                 $EncontroService->addUsuarioEncontro($id_usuario, $id_encontro, $deps);
                 break; 
+
+            // --- NOVOS CASOS ---
+            case 'cancelarReserva':
+            case 'deleteUsuarioEncontro':
+                $id_encontro = $_POST['id_encontro'] ?? throw new Exception("id_encontro faltando");
+                $id_usuario = $_POST['id_usuario'] ?? throw new Exception("id_usuario faltando");
+                $EncontroService->deleteUsuarioEncontro($id_usuario, $id_encontro);
+                break;
+
+            case 'verificarReserva':
+                $id_encontro = $_GET['id_encontro'] ?? throw new Exception("id_encontro faltando");
+                $id_usuario = $_GET['id_usuario'] ?? throw new Exception("id_usuario faltando");
+                $EncontroService->verificarReserva($id_usuario, $id_encontro);
+                break;
+            // -------------------
 
             case 'getMinhasReservas':
                 $id_usuario = $_GET['id_usuario'] ?? throw new Exception("id_usuario faltando");
