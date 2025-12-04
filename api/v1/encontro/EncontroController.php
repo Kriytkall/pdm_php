@@ -15,8 +15,24 @@
                 $deps = $_POST['nu_dependentes'] ?? 0;
                 $EncontroService->addUsuarioEncontro($id_usuario, $id_encontro, $deps);
                 break; 
+            
+            case 'aprovarReserva':
+                $id_encontro = $_POST['id_encontro'] ?? throw new Exception("id_encontro faltando");
+                $id_convidado = $_POST['id_convidado'] ?? throw new Exception("id_convidado faltando");
+                $EncontroService->aprovarReserva($id_encontro, $id_convidado);
+                break;
 
-            // --- NOVOS CASOS ---
+            case 'rejeitarReserva':
+                $id_encontro = $_POST['id_encontro'] ?? throw new Exception("id_encontro faltando");
+                $id_convidado = $_POST['id_convidado'] ?? throw new Exception("id_convidado faltando");
+                $EncontroService->rejeitarReserva($id_encontro, $id_convidado);
+                break;
+
+            case 'getParticipantes':
+                $id_encontro = $_GET['id_encontro'] ?? throw new Exception("id_encontro faltando");
+                $EncontroService->getParticipantes($id_encontro);
+                break;
+
             case 'cancelarReserva':
             case 'deleteUsuarioEncontro':
                 $id_encontro = $_POST['id_encontro'] ?? throw new Exception("id_encontro faltando");
@@ -29,7 +45,6 @@
                 $id_usuario = $_GET['id_usuario'] ?? throw new Exception("id_usuario faltando");
                 $EncontroService->verificarReserva($id_usuario, $id_encontro);
                 break;
-            // -------------------
 
             case 'getMinhasReservas':
                 $id_usuario = $_GET['id_usuario'] ?? throw new Exception("id_usuario faltando");

@@ -2,8 +2,6 @@
 require_once('../../database/InstanciaBanco.php');
 
 class CardapioService extends InstanciaBanco {
-    
-    // ... (Mantenha getCardapio e getCardapios iguais) ...
     public function getCardapio() {
         $sql = "SELECT * from tb_cardapio_dn where id_cardapio = ".$_GET['id_cardapio'];
         $consulta = $this->conexao->query($sql);
@@ -52,29 +50,34 @@ class CardapioService extends InstanciaBanco {
         try {
             $this->conexao->beginTransaction();
 
-            // 1. CRIAR LOCAL (mantém igual)
-            $sqlSeqL = "select id_sequence from tb_sequence_dn order by id_sequence desc limit 1";
-            $resSeq = $this->conexao->query($sqlSeqL)->fetch(PDO::FETCH_ASSOC);
-            $idLocal = ($resSeq ? $resSeq['id_sequence'] : 0) + 1;
-            $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idLocal, 'L')");
+            $idLocal = 0;
+            if (isset($dados['id_local']) && !empty($dados['id_local']) && $dados['id_local'] != 'novo') {
+                $idLocal = $dados['id_local'];
+            } 
+            else {
+                $sqlSeqL = "select id_sequence from tb_sequence_dn order by id_sequence desc limit 1";
+                $resSeq = $this->conexao->query($sqlSeqL)->fetch(PDO::FETCH_ASSOC);
+                $idLocal = ($resSeq ? $resSeq['id_sequence'] : 0) + 1;
+                $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idLocal, 'L')");
 
-            $sqlLocal = "INSERT INTO tb_local_dn (id_local, id_usuario, nu_cep, nu_casa) VALUES (:id, :user, :cep, :num)";
-            $stmtL = $this->conexao->prepare($sqlLocal);
-            $stmtL->execute([
-                ':id' => $idLocal,
-                ':user' => $dados['id_usuario'],
-                ':cep' => $dados['nu_cep'],
-                ':num' => $dados['nu_casa']
-            ]);
+                $sqlLocal = "INSERT INTO tb_local_dn (id_local, id_usuario, nu_cep, nu_casa) VALUES (:id, :user, :cep, :num)";
+                $stmtL = $this->conexao->prepare($sqlLocal);
+                $stmtL->execute([
+                    ':id' => $idLocal,
+                    ':user' => $dados['id_usuario'],
+                    ':cep' => $dados['nu_cep'], 
+                    ':num' => $dados['nu_casa']
+                ]);
+            }
+            
+            $idCardapio = $idLocal + 1; 
+            $sqlSeqC = "select id_sequence from tb_sequence_dn order by id_sequence desc limit 1";
+            $resSeqC = $this->conexao->query($sqlSeqC)->fetch(PDO::FETCH_ASSOC);
+            $idCardapio = ($resSeqC ? $resSeqC['id_sequence'] : 0) + 1;
 
-            // 2. CRIAR CARDAPIO (AQUI ESTÁ A CORREÇÃO!)
-            $idCardapio = $idLocal + 1;
             $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idCardapio, 'C')");
 
-            // --- CORREÇÃO: Adicionei vl_foto_cardapio no INSERT ---
-            $sqlCard = "INSERT INTO tb_cardapio_dn (id_cardapio, id_local, nm_cardapio, ds_cardapio, preco_refeicao, vl_foto_cardapio) 
-                        VALUES (:id, :loc, :nome, :desc, :preco, :foto)";
-            
+            $sqlCard = "INSERT INTO tb_cardapio_dn (id_cardapio, id_local, nm_cardapio, ds_cardapio, preco_refeicao, vl_foto_cardapio) VALUES (:id, :loc, :nome, :desc, :preco, :foto)";
             $stmtC = $this->conexao->prepare($sqlCard);
             $stmtC->execute([
                 ':id' => $idCardapio,
@@ -82,11 +85,9 @@ class CardapioService extends InstanciaBanco {
                 ':nome' => $dados['nm_cardapio'],
                 ':desc' => $dados['ds_cardapio'],
                 ':preco' => $dados['preco_refeicao'],
-                ':foto' => $dados['vl_foto'] // <--- O PHP agora salva o link!
+                ':foto' => $dados['vl_foto']
             ]);
-            // -----------------------------------------------------
 
-            // 3. CRIAR ENCONTRO (mantém igual)
             $idEncontro = $idCardapio + 1;
             $this->conexao->query("INSERT INTO tb_sequence_dn (id_sequence, nm_sequence) VALUES ($idEncontro, 'E')");
 
@@ -113,7 +114,6 @@ class CardapioService extends InstanciaBanco {
         try {
             $this->conexao->beginTransaction();
 
-            // 1. Atualiza Cardápio (Título, Descrição, Preço, Foto)
             $sqlC = "UPDATE tb_cardapio_dn SET 
                         nm_cardapio = :nome, 
                         ds_cardapio = :desc, 
@@ -130,11 +130,10 @@ class CardapioService extends InstanciaBanco {
                 ':id' => $dados['id_cardapio']
             ]);
 
-            // 2. Atualiza Encontro (Data, Vagas) - Usando id_cardapio para achar
             $sqlE = "UPDATE tb_encontro_dn SET 
                         hr_encontro = :hora, 
                         nu_max_convidados = :vagas 
-                     WHERE id_cardapio = :idCardapio"; // Assumindo relação 1-1
+                     WHERE id_cardapio = :idCardapio";
             
             $stmtE = $this->conexao->prepare($sqlE);
             $stmtE->execute([
@@ -143,7 +142,6 @@ class CardapioService extends InstanciaBanco {
                 ':idCardapio' => $dados['id_cardapio']
             ]);
 
-            // 3. Atualiza Local (CEP, Número) - Busca id_local pelo cardapio
             $sqlL = "UPDATE tb_local_dn SET 
                         nu_cep = :cep, 
                         nu_casa = :num 
@@ -165,12 +163,10 @@ class CardapioService extends InstanciaBanco {
         }
     }
 
-    // --- DELETAR JANTAR (COM LIMPEZA) ---
     public function deleteJantar($idCardapio) {
         try {
             $this->conexao->beginTransaction();
 
-            // 1. Descobrir IDs relacionados
             $sqlIds = "SELECT id_local, id_encontro FROM tb_encontro_dn WHERE id_cardapio = :id";
             $stmt = $this->conexao->prepare($sqlIds);
             $stmt->execute([':id' => $idCardapio]);
@@ -178,19 +174,12 @@ class CardapioService extends InstanciaBanco {
 
             if ($ids) {
                 $idEncontro = $ids['id_encontro'];
-                $idLocal = $ids['id_local'];
 
-                // 2. Remover Participantes (tb_encontro_usuario_dn)
                 $this->conexao->exec("DELETE FROM tb_encontro_usuario_dn WHERE id_encontro = $idEncontro");
 
-                // 3. Remover Encontro (tb_encontro_dn)
                 $this->conexao->exec("DELETE FROM tb_encontro_dn WHERE id_encontro = $idEncontro");
 
-                // 4. Remover Cardapio (tb_cardapio_dn)
                 $this->conexao->exec("DELETE FROM tb_cardapio_dn WHERE id_cardapio = $idCardapio");
-
-                // 5. Remover Local (tb_local_dn) - Opcional, se o local for exclusivo desse jantar
-                $this->conexao->exec("DELETE FROM tb_local_dn WHERE id_local = $idLocal");
             }
 
             $this->conexao->commit();

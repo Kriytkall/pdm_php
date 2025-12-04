@@ -22,12 +22,11 @@
                     'preco_refeicao'    => $_POST['preco_refeicao'] ?? throw new Exception("Faltou preco"),
                     'hr_encontro'       => $_POST['hr_encontro'] ?? throw new Exception("Faltou data"),
                     'nu_max_convidados' => $_POST['nu_max_convidados'] ?? throw new Exception("Faltou vagas"),
-                    'nu_cep'            => $_POST['nu_cep'] ?? throw new Exception("Faltou cep"),
-                    'nu_casa'           => $_POST['nu_casa'] ?? throw new Exception("Faltou numero"),
-                    // LINHA IMPORTANTE ADICIONADA:
-                    'vl_foto'           => $_POST['vl_foto'] ?? null, 
+                    'nu_cep'            => $_POST['nu_cep'] ?? null,
+                    'nu_casa'           => $_POST['nu_casa'] ?? null,           
+                    'vl_foto'           => $_POST['vl_foto'] ?? null,
+                    'id_local'          => $_POST['id_local'] ?? null, 
                 ];
-                
                 $CardapioService->createJantarCompleto($dados);
                 break;
                 

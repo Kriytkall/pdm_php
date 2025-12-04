@@ -37,8 +37,6 @@ class AvaliacaoService extends InstanciaBanco {
     }
 
     public function getMediaAvaliacaoUsuario($id_anfitriao) {
-        // --- CORREÇÃO NA QUERY ---
-        // Usamos COUNT(av.vl_avaliacao) em vez de id_avaliacao_encontro que não existe
         $sql = "
             SELECT 
                 COALESCE(AVG(av.vl_avaliacao), 0) as media_geral, 
@@ -58,10 +56,6 @@ class AvaliacaoService extends InstanciaBanco {
         
         $media = $resultado['media_geral'] ? round($resultado['media_geral'], 1) : 0;
         $total = $resultado['total_avaliacoes'] ? $resultado['total_avaliacoes'] : 0;
-
-        // Como salvamos 3 notas por jantar (Comida, Hospitalidade, Pontualidade),
-        // o total real de "avaliações de pessoas" é o total de registros dividido por 3.
-        // Mas para simplificar e mostrar atividade, vamos mostrar o total de itens avaliados.
         
         $this->banco->setDados(1, [
             "media" => $media,
